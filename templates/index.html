@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPK Deteksi Awal Lesi Kulit</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background : #f5f6fa;
+      color      : #2d3748;
+      min-height : 100vh;
+      padding    : 30px 20px;
+    }
+
+    .container {
+      max-width : 650px;
+      margin    : 0 auto;
+    }
+
+    /* HEADER */
+    .header {
+      text-align    : center;
+      margin-bottom : 28px;
+    }
+    .header h1 {
+      font-size  : 22px;
+      font-weight: 700;
+      color      : #2d3748;
+    }
+    .header p {
+      font-size : 13px;
+      color     : #718096;
+      margin-top: 6px;
+    }
+    .badge {
+      display      : inline-block;
+      background   : #ebf4ff;
+      color        : #3182ce;
+      font-size    : 11px;
+      padding      : 3px 10px;
+      border-radius: 99px;
+      margin-top   : 8px;
+      font-weight  : 500;
+    }
+
+    /* CARD */
+    .card {
+      background   : white;
+      border-radius: 12px;
+      padding      : 24px;
+      box-shadow   : 0 1px 6px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size     : 12px;
+      font-weight   : 600;
+      color         : #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom : 14px;
+    }
+
+    /* UPLOAD */
+    .upload-area {
+      border       : 2px dashed #cbd5e0;
+      border-radius: 10px;
+      padding      : 36px 20px;
+      text-align   : center;
+      cursor       : pointer;
+      transition   : all 0.2s;
+    }
+    .upload-area:hover,
+    .upload-area.dragover {
+      border-color: #4299e1;
+      background  : #ebf8ff;
+    }
+    .upload-icon { font-size: 36px; margin-bottom: 10px; }
+    .upload-text { font-size: 15px; color: #4a5568; }
+    .upload-hint { font-size: 12px; color: #a0aec0; margin-top: 6px; }
+    #fileInput   { display: none; }
+
+    /* PREVIEW */
+    #previewWrap {
+      display      : none;
+      text-align   : center;
+      margin-bottom: 14px;
+    }
+    #previewImg {
+      max-width    : 100%;
+      max-height   : 260px;
+      border-radius: 8px;
+      border       : 1px solid #e2e8f0;
+      object-fit   : cover;
+    }
+
+    /* BUTTON */
+    .btn {
+      width        : 100%;
+      padding      : 13px;
+      background   : #3182ce;
+      color        : white;
+      border       : none;
+      border-radius: 8px;
+      font-size    : 15px;
+      font-weight  : 600;
+      cursor       : pointer;
+      transition   : background 0.2s;
+      margin-top   : 14px;
+    }
+    .btn:hover    { background: #2b6cb0; }
+    .btn:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    /* LOADING */
+    .loading {
+      display   : none;
+      text-align: center;
+      padding   : 16px;
+      color     : #718096;
+      font-size : 14px;
+    }
+    .spinner {
+      display      : inline-block;
+      width        : 16px;
+      height       : 16px;
+      border       : 3px solid #e2e8f0;
+      border-top   : 3px solid #3182ce;
+      border-radius: 50%;
+      animation    : spin 0.8s linear infinite;
+      margin-right : 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* RESULT */
+    #resultCard { display: none; }
+
+    .result-box {
+      padding      : 18px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      display      : flex;
+      align-items  : center;
+      gap          : 14px;
+    }
+    .box-benign    { background: #f0fff4; border: 1px solid #9ae6b4; }
+    .box-malignant { background: #fff5f5; border: 1px solid #feb2b2; }
+    .box-unknown   { background: #fffbeb; border: 1px solid #f6e05e; }
+
+    .result-icon  { font-size: 36px; }
+    .result-label {
+      font-size  : 20px;
+      font-weight: 700;
+    }
+    .label-benign    { color: #276749; }
+    .label-malignant { color: #9b2c2c; }
+    .label-unknown   { color: #744210; }
+    .result-sub {
+      font-size : 13px;
+      color     : #718096;
+      margin-top: 3px;
+    }
+
+    /* CONFIDENCE BAR */
+    .conf-row {
+      display        : flex;
+      justify-content: space-between;
+      font-size      : 13px;
+      color          : #4a5568;
+      margin-bottom  : 8px;
+    }
+    .bar-wrap {
+      height       : 10px;
+      background   : #e2e8f0;
+      border-radius: 99px;
+      overflow     : hidden;
+      margin-bottom: 16px;
+    }
+    .bar-fill {
+      height       : 100%;
+      border-radius: 99px;
+      transition   : width 0.6s ease;
+    }
+    .fill-benign    { background: #48bb78; }
+    .fill-malignant { background: #fc8181; }
+    .fill-unknown   { background: #f6ad55; }
+
+    /* PROB */
+    .prob-row {
+      display        : flex;
+      justify-content: space-between;
+      font-size      : 13px;
+      padding        : 8px 0;
+      border-bottom  : 1px solid #f7fafc;
+      color          : #4a5568;
+    }
+    .prob-row:last-child { border-bottom: none; }
+    .prob-val { font-weight: 600; }
+
+    /* DISCLAIMER */
+    .disclaimer {
+      font-size : 12px;
+      color     : #a0aec0;
+      text-align: center;
+      margin-top: 16px;
+      font-style: italic;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>🔬 SPK Deteksi Awal Lesi Kulit</h1>
+    <p>Sistem Penunjang Keputusan berbasis CNN (MobileNetV2) + SVM</p>
+    <span class="badge">Dataset: ISIC | Akurasi: 87.73%</span>
+  </div>
+
+  <!-- UPLOAD CARD -->
+  <div class="card">
+    <div class="card-title">Upload Citra Lesi Kulit</div>
+
+    <div id="previewWrap">
+      <img id="previewImg" src="" alt="Preview">
+    </div>
+
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-icon">📷</div>
+      <div class="upload-text">Klik atau drag & drop foto di sini</div>
+      <div class="upload-hint">Format: JPG, PNG, WEBP • Maksimal 16MB</div>
+      <input type="file" id="fileInput"
+             accept=".jpg,.jpeg,.png,.webp">
+    </div>
+
+    <button class="btn" id="predictBtn"
+            disabled onclick="predict()">
+      Analisis Gambar
+    </button>
+
+    <div class="loading" id="loading">
+      <span class="spinner"></span>
+      Menganalisis gambar...
+    </div>
+  </div>
+
+  <!-- RESULT CARD -->
+  <div class="card" id="resultCard">
+    <div class="card-title">Hasil Prediksi</div>
+
+    <!-- Kotak hasil utama -->
+    <div class="result-box" id="resultBox">
+      <div class="result-icon" id="resultIcon"></div>
+      <div>
+        <div class="result-label" id="resultLabel"></div>
+        <div class="result-sub"   id="resultSub"></div>
+      </div>
+    </div>
+
+    <!-- Confidence bar -->
+    <div class="conf-row">
+      <span>Confidence</span>
+      <span id="confVal">-</span>
+    </div>
+    <div class="bar-wrap">
+      <div class="bar-fill" id="barFill" style="width:0%"></div>
+    </div>
+
+    <!-- Probabilitas -->
+    <div class="card-title">Probabilitas</div>
+    <div class="prob-row">
+      <span>Benign (Jinak)</span>
+      <span class="prob-val" id="probB">-</span>
+    </div>
+    <div class="prob-row">
+      <span>Malignant (Ganas)</span>
+      <span class="prob-val" id="probM">-</span>
+    </div>
+
+    <p class="disclaimer">
+      ⚠️ Hasil ini hanya untuk keperluan akademik.<br>
+      Konsultasikan dengan dokter spesialis kulit.
+    </p>
+  </div>
+
+</div>
+<script>
+const uploadArea  = document.getElementById('uploadArea');
+const fileInput   = document.getElementById('fileInput');
+const previewWrap = document.getElementById('previewWrap');
+const previewImg  = document.getElementById('previewImg');
+const predictBtn  = document.getElementById('predictBtn');
+const resultCard  = document.getElementById('resultCard');
+const loading     = document.getElementById('loading');
+
+uploadArea.onclick = () => fileInput.click();
+
+uploadArea.addEventListener('dragover', e => {
+  e.preventDefault();
+  uploadArea.classList.add('dragover');
+});
+uploadArea.addEventListener('dragleave', () =>
+  uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.onchange = () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+};
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    previewImg.src            = e.target.result;
+    previewWrap.style.display = 'block';
+    predictBtn.disabled       = false;
+    resultCard.style.display  = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function predict() {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  predictBtn.disabled      = true;
+  loading.style.display    = 'block';
+  resultCard.style.display = 'none';
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res  = await fetch('/predict', { method:'POST', body: formData });
+    const data = await res.json();
+    loading.style.display = 'none';
+    predictBtn.disabled   = false;
+
+    if (data.error) { showError(data.error); return; }
+    showResult(data);
+  } catch (err) {
+    loading.style.display = 'none';
+    predictBtn.disabled   = false;
+    showError('Gagal terhubung ke server.');
+  }
+}
+
+function showResult(data) {
+  const isB = data.result === 'benign';
+  const isU = data.result === 'Tidak dapat ditentukan';
+
+  // Kotak hasil
+  const box = document.getElementById('resultBox');
+  box.className = 'result-box ' +
+    (isU ? 'box-unknown' : isB ? 'box-benign' : 'box-malignant');
+
+  document.getElementById('resultIcon').textContent =
+    isU ? '❓' : isB ? '✅' : '⚠️';
+
+  const lbl = document.getElementById('resultLabel');
+  lbl.textContent = isU ? 'Tidak Dapat Ditentukan'
+                  : isB ? 'BENIGN (Jinak)'
+                  :       'MALIGNANT (Ganas)';
+  lbl.className = 'result-label ' +
+    (isU ? 'label-unknown' : isB ? 'label-benign' : 'label-malignant');
+
+  document.getElementById('resultSub').textContent =
+    `Tingkat Keyakinan: ${data.level}`;
+
+  // Confidence bar
+  document.getElementById('confVal').textContent = `${data.confidence}%`;
+  const fill = document.getElementById('barFill');
+  fill.style.width = `${data.confidence}%`;
+  fill.className   = 'bar-fill ' +
+    (isU ? 'fill-unknown' : isB ? 'fill-benign' : 'fill-malignant');
+
+  // Probabilitas (hitung dari confidence)
+  const probB = isB ? data.confidence : (100 - data.confidence);
+  const probM = isB ? (100 - data.confidence) : data.confidence;
+  document.getElementById('probB').textContent = `${probB.toFixed(2)}%`;
+  document.getElementById('probM').textContent = `${probM.toFixed(2)}%`;
+
+  resultCard.style.display = 'block';
+  resultCard.scrollIntoView({ behavior: 'smooth' });
+}
+
+function showError(msg) {
+  const box = document.getElementById('resultBox');
+  box.className = 'result-box box-unknown';
+  document.getElementById('resultIcon').textContent  = '❌';
+  document.getElementById('resultLabel').textContent = 'Error';
+  document.getElementById('resultLabel').className   = 'result-label label-unknown';
+  document.getElementById('resultSub').textContent   = msg;
+  document.getElementById('confVal').textContent     = '-';
+  document.getElementById('barFill').style.width     = '0%';
+  document.getElementById('probB').textContent       = '-';
+  document.getElementById('probM').textContent       = '-';
+  resultCard.style.display = 'block';
+}
+</script>
+</body>
+</html>
