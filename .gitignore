@@ -2,3 +2,18 @@ venv311/
 __pycache__/
 *.pyc
 .env
+
+# Upload foto dari user (tidak perlu di-push)
+static/uploads/
+
+# Data pending & trained (dikelola lokal oleh admin)
+data/pending/
+data/trained/
+
+# File backup model
+svm_mobilenet_model_backup.pkl
+
+# Folder test lokal
+gambar untuk di coba di sistem (bukan dataset)/
+test/benign/Download dari Google/
+test/benign/Hasil Foto Camera/

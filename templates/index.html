@@ -3,340 +3,861 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SPK Deteksi Awal Lesi Kulit</title>
+  <title>DermaScan AI – Deteksi Dini Lesi Kulit</title>
+  <meta name="description" content="Sistem Penunjang Keputusan deteksi dini lesi kulit berbasis AI menggunakan CNN MobileNetV2 + SVM. Upload foto dan dapatkan analisis instan.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    /* ===== CSS VARIABLES ===== */
+    :root {
+      --bg:        #060b18;
+      --surface:   #0d1525;
+      --surface2:  #111d35;
+      --surface3:  #162040;
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.12);
+      --accent:    #6366f1;
+      --accent2:   #818cf8;
+      --accent3:   #a5b4fc;
+      --green:     #10b981;
+      --green2:    #34d399;
+      --red:       #ef4444;
+      --red2:      #f87171;
+      --yellow:    #f59e0b;
+      --yellow2:   #fbbf24;
+      --text:      #f1f5f9;
+      --text2:     #cbd5e1;
+      --muted:     #64748b;
+      --muted2:    #475569;
+      --radius:    18px;
+      --radius-sm: 12px;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background : #f5f6fa;
-      color      : #2d3748;
-      min-height : 100vh;
-      padding    : 30px 20px;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 20px 80px;
+      overflow-x: hidden;
     }
 
-    .container {
-      max-width : 650px;
-      margin    : 0 auto;
+    /* ===== ANIMATED BACKGROUND ===== */
+    .bg-orbs {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    }
+    .orb {
+      position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.18; animation: orbFloat 12s ease-in-out infinite;
+    }
+    .orb-1 { width: 500px; height: 500px; background: #6366f1; top: -150px; left: -100px; animation-delay: 0s; }
+    .orb-2 { width: 400px; height: 400px; background: #10b981; top: 30%; right: -120px; animation-delay: -4s; }
+    .orb-3 { width: 350px; height: 350px; background: #818cf8; bottom: -100px; left: 20%; animation-delay: -8s; }
+    @keyframes orbFloat {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50%       { transform: translateY(-30px) scale(1.05); }
     }
 
-    /* HEADER */
-    .header {
-      text-align    : center;
-      margin-bottom : 28px;
+    .container { max-width: 720px; margin: 0 auto; position: relative; z-index: 1; }
+
+    /* ===== HEADER ===== */
+    .header { text-align: center; margin-bottom: 40px; }
+    .logo-ring {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 80px; height: 80px; border-radius: 24px;
+      background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+      font-size: 36px; margin-bottom: 20px;
+      box-shadow: 0 0 60px rgba(99,102,241,0.5), 0 0 20px rgba(99,102,241,0.3);
+      animation: logoPulse 3s ease-in-out infinite;
+    }
+    @keyframes logoPulse {
+      0%, 100% { box-shadow: 0 0 60px rgba(99,102,241,0.5), 0 0 20px rgba(99,102,241,0.3); }
+      50%       { box-shadow: 0 0 80px rgba(99,102,241,0.7), 0 0 40px rgba(99,102,241,0.4); }
     }
     .header h1 {
-      font-size  : 22px;
-      font-weight: 700;
-      color      : #2d3748;
+      font-size: 36px; font-weight: 900; letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 60%, #818cf8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 8px;
     }
-    .header p {
-      font-size : 13px;
-      color     : #718096;
-      margin-top: 6px;
+    .header .subtitle { font-size: 14px; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.25);
+      color: var(--accent3); font-size: 12px; font-weight: 600;
+      padding: 6px 16px; border-radius: 99px;
     }
-    .badge {
-      display      : inline-block;
-      background   : #ebf4ff;
-      color        : #3182ce;
-      font-size    : 11px;
-      padding      : 3px 10px;
-      border-radius: 99px;
-      margin-top   : 8px;
-      font-weight  : 500;
+    .status-dot {
+      width: 7px; height: 7px; background: var(--green2); border-radius: 50%;
+      animation: blink 2s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
     }
 
-    /* CARD */
+    /* ===== METRIC GRID ===== */
+    .metric-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px;
+    }
+    .metric-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 18px 14px; text-align: center;
+      position: relative; overflow: hidden; transition: transform 0.2s;
+    }
+    .metric-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+    .metric-card:hover { transform: translateY(-2px); }
+    .metric-val { font-size: 24px; font-weight: 800; color: var(--accent3); }
+    .metric-label { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+    .metric-icon { font-size: 18px; margin-bottom: 6px; }
+
+    /* ===== CARD ===== */
     .card {
-      background   : white;
-      border-radius: 12px;
-      padding      : 24px;
-      box-shadow   : 0 1px 6px rgba(0,0,0,0.08);
-      margin-bottom: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 28px; margin-bottom: 20px;
     }
-    .card-title {
-      font-size     : 12px;
-      font-weight   : 600;
-      color         : #718096;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom : 14px;
+    .card-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 22px;
     }
+    .card-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: rgba(99,102,241,0.15); display: flex; align-items: center;
+      justify-content: center; font-size: 16px; flex-shrink: 0;
+    }
+    .card-title { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; }
 
-    /* UPLOAD */
-    .upload-area {
-      border       : 2px dashed #cbd5e0;
-      border-radius: 10px;
-      padding      : 36px 20px;
-      text-align   : center;
-      cursor       : pointer;
-      transition   : all 0.2s;
+    /* ===== UPLOAD ===== */
+    .upload-zone {
+      border: 2px dashed rgba(99,102,241,0.3); border-radius: var(--radius-sm);
+      padding: 48px 24px; text-align: center; cursor: pointer;
+      transition: all 0.3s; background: rgba(99,102,241,0.03);
+      position: relative;
     }
-    .upload-area:hover,
-    .upload-area.dragover {
-      border-color: #4299e1;
-      background  : #ebf8ff;
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent); background: rgba(99,102,241,0.08);
+      transform: translateY(-2px);
     }
-    .upload-icon { font-size: 36px; margin-bottom: 10px; }
-    .upload-text { font-size: 15px; color: #4a5568; }
-    .upload-hint { font-size: 12px; color: #a0aec0; margin-top: 6px; }
-    #fileInput   { display: none; }
+    .upload-zone .upload-icon-big { font-size: 48px; margin-bottom: 14px; display: block; }
+    .upload-zone .upload-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .upload-zone .upload-desc { font-size: 13px; color: var(--muted); }
+    .upload-zone .upload-types {
+      display: inline-flex; gap: 6px; margin-top: 14px;
+    }
+    .upload-types span {
+      font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 99px;
+      background: rgba(99,102,241,0.12); color: var(--accent3); border: 1px solid rgba(99,102,241,0.2);
+    }
+    #fileInput { display: none; }
 
-    /* PREVIEW */
+    /* ===== PREVIEW ===== */
     #previewWrap {
-      display      : none;
-      text-align   : center;
-      margin-bottom: 14px;
+      display: none; margin-bottom: 18px; animation: fadeIn 0.35s ease;
+    }
+    .preview-box {
+      position: relative; border-radius: var(--radius-sm); overflow: hidden;
+      border: 2px solid var(--border2); background: var(--surface2);
     }
     #previewImg {
-      max-width    : 100%;
-      max-height   : 260px;
-      border-radius: 8px;
-      border       : 1px solid #e2e8f0;
-      object-fit   : cover;
+      width: 100%; max-height: 300px; object-fit: contain;
+      display: block; border-radius: calc(var(--radius-sm) - 2px);
     }
+    .preview-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(6,11,24,0.85));
+      padding: 16px 14px 12px; display: flex; align-items: center; gap: 10px;
+    }
+    .preview-file-icon { font-size: 18px; }
+    .preview-filename { font-size: 13px; font-weight: 600; color: var(--text); }
+    .preview-filesize { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .preview-change {
+      margin-left: auto; font-size: 12px; color: var(--accent3); cursor: pointer;
+      font-weight: 600; background: rgba(99,102,241,0.12); padding: 4px 10px;
+      border-radius: 6px; border: 1px solid rgba(99,102,241,0.2);
+      transition: all 0.2s;
+    }
+    .preview-change:hover { background: rgba(99,102,241,0.2); }
 
-    /* BUTTON */
-    .btn {
-      width        : 100%;
-      padding      : 13px;
-      background   : #3182ce;
-      color        : white;
-      border       : none;
-      border-radius: 8px;
-      font-size    : 15px;
-      font-weight  : 600;
-      cursor       : pointer;
-      transition   : background 0.2s;
-      margin-top   : 14px;
+    /* ===== BUTTON ===== */
+    .btn-analyze {
+      width: 100%; padding: 16px; margin-top: 18px;
+      background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+      color: white; border: none; border-radius: var(--radius-sm);
+      font-size: 16px; font-weight: 700; cursor: pointer; letter-spacing: 0.03em;
+      transition: all 0.25s; box-shadow: 0 6px 24px rgba(99,102,241,0.35);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
     }
-    .btn:hover    { background: #2b6cb0; }
-    .btn:disabled { background: #a0aec0; cursor: not-allowed; }
+    .btn-analyze:hover:not(:disabled) {
+      transform: translateY(-2px); box-shadow: 0 10px 36px rgba(99,102,241,0.5);
+    }
+    .btn-analyze:disabled {
+      background: var(--surface2); color: var(--muted2); box-shadow: none;
+      cursor: not-allowed; transform: none;
+    }
+    .btn-icon { font-size: 18px; }
 
-    /* LOADING */
-    .loading {
-      display   : none;
-      text-align: center;
-      padding   : 16px;
-      color     : #718096;
-      font-size : 14px;
+    /* ===== LOADING ===== */
+    #loading { display: none; text-align: center; padding: 28px 0; }
+    .spinner-wrap { position: relative; display: inline-block; width: 50px; height: 50px; margin-bottom: 16px; }
+    .ring-outer {
+      width: 50px; height: 50px; border-radius: 50%;
+      border: 3px solid rgba(99,102,241,0.15);
+      border-top-color: var(--accent); animation: spin 0.9s linear infinite;
+      position: absolute;
     }
-    .spinner {
-      display      : inline-block;
-      width        : 16px;
-      height       : 16px;
-      border       : 3px solid #e2e8f0;
-      border-top   : 3px solid #3182ce;
-      border-radius: 50%;
-      animation    : spin 0.8s linear infinite;
-      margin-right : 8px;
-      vertical-align: middle;
+    .ring-inner {
+      width: 34px; height: 34px; border-radius: 50%; top: 8px; left: 8px;
+      border: 3px solid rgba(99,102,241,0.08);
+      border-bottom-color: var(--accent2); animation: spin 0.6s linear infinite reverse;
+      position: absolute;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 14px; color: var(--muted); font-weight: 500; }
+    .loading-sub   { font-size: 12px; color: var(--muted2); margin-top: 4px; }
 
-    /* RESULT */
-    #resultCard { display: none; }
+    /* ===== RESULT CARD ===== */
+    #resultCard { display: none; animation: slideUp 0.45s cubic-bezier(0.22,1,0.36,1); }
 
-    .result-box {
-      padding      : 18px;
-      border-radius: 10px;
-      margin-bottom: 16px;
-      display      : flex;
-      align-items  : center;
-      gap          : 14px;
+    /* Result Hero Banner */
+    .result-banner {
+      border-radius: var(--radius-sm); padding: 22px 20px;
+      display: flex; align-items: center; gap: 18px; margin-bottom: 24px;
+      position: relative; overflow: hidden;
     }
-    .box-benign    { background: #f0fff4; border: 1px solid #9ae6b4; }
-    .box-malignant { background: #fff5f5; border: 1px solid #feb2b2; }
-    .box-unknown   { background: #fffbeb; border: 1px solid #f6e05e; }
+    .result-banner::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+    .banner-benign    { background: rgba(16,185,129,0.08);  border: 1px solid rgba(16,185,129,0.2); }
+    .banner-malignant { background: rgba(239,68,68,0.08);   border: 1px solid rgba(239,68,68,0.2); }
+    .banner-unknown   { background: rgba(245,158,11,0.08);  border: 1px solid rgba(245,158,11,0.2); }
+    .banner-benign::before    { background: linear-gradient(90deg, var(--green), var(--green2)); }
+    .banner-malignant::before { background: linear-gradient(90deg, var(--red),   var(--red2)); }
+    .banner-unknown::before   { background: linear-gradient(90deg, var(--yellow), var(--yellow2)); }
 
-    .result-icon  { font-size: 36px; }
-    .result-label {
-      font-size  : 20px;
-      font-weight: 700;
+    .banner-icon {
+      width: 64px; height: 64px; border-radius: 18px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 30px;
     }
-    .label-benign    { color: #276749; }
-    .label-malignant { color: #9b2c2c; }
-    .label-unknown   { color: #744210; }
-    .result-sub {
-      font-size : 13px;
-      color     : #718096;
-      margin-top: 3px;
-    }
+    .icon-bg-benign    { background: rgba(16,185,129,0.15); }
+    .icon-bg-malignant { background: rgba(239,68,68,0.15); }
+    .icon-bg-unknown   { background: rgba(245,158,11,0.15); }
 
-    /* CONFIDENCE BAR */
-    .conf-row {
-      display        : flex;
-      justify-content: space-between;
-      font-size      : 13px;
-      color          : #4a5568;
-      margin-bottom  : 8px;
+    .banner-body { flex: 1; min-width: 0; }
+    .banner-tag {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; margin-bottom: 6px; padding: 3px 10px;
+      border-radius: 99px; display: inline-block;
     }
-    .bar-wrap {
-      height       : 10px;
-      background   : #e2e8f0;
-      border-radius: 99px;
-      overflow     : hidden;
-      margin-bottom: 16px;
+    .tag-benign    { background: rgba(16,185,129,0.15); color: var(--green2); }
+    .tag-malignant { background: rgba(239,68,68,0.15);  color: var(--red2); }
+    .tag-unknown   { background: rgba(245,158,11,0.15); color: var(--yellow2); }
+
+    .banner-label { font-size: 24px; font-weight: 900; letter-spacing: -0.02em; }
+    .label-benign    { color: var(--green2); }
+    .label-malignant { color: var(--red2); }
+    .label-unknown   { color: var(--yellow2); }
+    .banner-desc { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    .banner-badge {
+      text-align: right; flex-shrink: 0;
+    }
+    .confidence-ring {
+      font-size: 22px; font-weight: 900; line-height: 1;
+    }
+    .conf-benign    { color: var(--green2); }
+    .conf-malignant { color: var(--red2); }
+    .conf-unknown   { color: var(--yellow2); }
+    .banner-badge small { font-size: 11px; color: var(--muted); display: block; margin-top: 2px; }
+
+    /* ===== PROB BARS (main section) ===== */
+    .prob-section { margin-bottom: 24px; }
+    .prob-row { margin-bottom: 16px; }
+    .prob-row-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
+    }
+    .prob-label-wrap { display: flex; align-items: center; gap: 8px; }
+    .prob-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-benign    { background: var(--green2); }
+    .dot-malignant { background: var(--red2); }
+    .prob-name  { font-size: 14px; font-weight: 600; color: var(--text); }
+    .prob-desc  { font-size: 11px; color: var(--muted); }
+    .prob-pct   { font-size: 22px; font-weight: 800; }
+    .pct-benign    { color: var(--green2); }
+    .pct-malignant { color: var(--red2); }
+    .bar-track {
+      height: 10px; background: rgba(255,255,255,0.06);
+      border-radius: 99px; overflow: hidden;
     }
     .bar-fill {
-      height       : 100%;
-      border-radius: 99px;
-      transition   : width 0.6s ease;
+      height: 100%; border-radius: 99px;
+      transition: width 1s cubic-bezier(0.4,0,0.2,1);
+      width: 0%;
     }
-    .fill-benign    { background: #48bb78; }
-    .fill-malignant { background: #fc8181; }
-    .fill-unknown   { background: #f6ad55; }
+    .fill-benign    { background: linear-gradient(90deg, #059669, #34d399); }
+    .fill-malignant { background: linear-gradient(90deg, #dc2626, #f87171); }
 
-    /* PROB */
-    .prob-row {
-      display        : flex;
-      justify-content: space-between;
-      font-size      : 13px;
-      padding        : 8px 0;
-      border-bottom  : 1px solid #f7fafc;
-      color          : #4a5568;
+    /* ===== DETAIL GRID ===== */
+    .detail-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px;
     }
-    .prob-row:last-child { border-bottom: none; }
-    .prob-val { font-weight: 600; }
+    .detail-item {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 14px 16px;
+    }
+    .detail-item-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+    .detail-item-val { font-size: 16px; font-weight: 700; color: var(--text); }
 
-    /* DISCLAIMER */
+    /* ===== RECOMMENDATION ===== */
+    .rec-box {
+      border-radius: var(--radius-sm); padding: 18px 20px; margin-bottom: 24px;
+    }
+    .rec-benign    { background: rgba(16,185,129,0.06);  border: 1px solid rgba(16,185,129,0.15); }
+    .rec-malignant { background: rgba(239,68,68,0.06);   border: 1px solid rgba(239,68,68,0.15); }
+    .rec-unknown   { background: rgba(245,158,11,0.06);  border: 1px solid rgba(245,158,11,0.15); }
+    .rec-title {
+      font-size: 13px; font-weight: 700; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .rec-title-benign    { color: var(--green2); }
+    .rec-title-malignant { color: var(--red2); }
+    .rec-title-unknown   { color: var(--yellow2); }
+    .rec-list { padding-left: 0; list-style: none; }
+    .rec-list li {
+      font-size: 13px; color: var(--text2); line-height: 1.6;
+      padding: 4px 0; display: flex; gap: 8px; align-items: flex-start;
+    }
+    .rec-list li::before { content: '→'; flex-shrink: 0; color: var(--muted); margin-top: 1px; }
+
+    /* ===== DISCLAIMER ===== */
     .disclaimer {
-      font-size : 12px;
-      color     : #a0aec0;
-      text-align: center;
-      margin-top: 16px;
-      font-style: italic;
-      line-height: 1.6;
+      background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.18);
+      border-radius: var(--radius-sm); padding: 14px 18px;
+      font-size: 12px; color: #fcd34d; line-height: 1.7;
+      display: flex; gap: 12px; align-items: flex-start;
+    }
+    .disclaimer-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ===== TECH INFO ===== */
+    .tech-section { margin-top: 20px; }
+    .tech-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .tech-row:last-child { border-bottom: none; }
+    .tech-key { color: var(--muted); flex: 1; }
+    .tech-val { color: var(--text2); font-weight: 600; text-align: right; }
+
+    /* ===== UNKNOWN INFO CARD ===== */
+    .unknown-card {
+      display: flex; gap: 16px; align-items: flex-start;
+      background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2);
+      border-radius: var(--radius-sm); padding: 20px; margin-bottom: 24px;
+    }
+    .unknown-card-icon { font-size: 32px; flex-shrink: 0; line-height: 1; }
+    .unknown-card-title {
+      font-size: 17px; font-weight: 800; color: #fbbf24; margin-bottom: 10px;
+      letter-spacing: -0.01em;
+    }
+    .unknown-card-msg {
+      font-size: 13px; color: var(--text2); line-height: 1.75;
+      margin-bottom: 14px;
+    }
+    .unknown-training-note {
+      display: flex; gap: 10px; align-items: flex-start;
+      background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 10px; padding: 12px 14px;
+      font-size: 12px; color: #a5b4fc; line-height: 1.6;
+    }
+    .unknown-note-icon { font-size: 16px; flex-shrink: 0; }
+
+    /* ===== FOOTER ===== */
+    .footer { text-align: center; font-size: 12px; color: var(--muted2); margin-top: 40px; line-height: 1.7; }
+    .footer a { color: var(--muted); text-decoration: none; }
+
+    /* ===== FEEDBACK PANEL ===== */
+    .feedback-panel {
+      margin-top: 20px;
+      background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.2);
+      border-radius: var(--radius-sm); padding: 18px 20px;
+    }
+    .feedback-header {
+      display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;
+    }
+    .feedback-icon { font-size: 22px; flex-shrink: 0; }
+    .feedback-title { font-size: 14px; font-weight: 700; color: var(--accent3); margin-bottom: 4px; }
+    .feedback-sub   { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .feedback-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+    .fb-btn {
+      flex: 1; min-width: 140px; padding: 11px 16px; border: none; border-radius: 10px;
+      font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+    }
+    .fb-benign    { background: rgba(16,185,129,0.15); color: var(--green2); border: 1px solid rgba(16,185,129,0.3); }
+    .fb-benign:hover { background: rgba(16,185,129,0.25); transform: translateY(-1px); }
+    .fb-malignant { background: rgba(239,68,68,0.15); color: var(--red2); border: 1px solid rgba(239,68,68,0.3); }
+    .fb-malignant:hover { background: rgba(239,68,68,0.25); transform: translateY(-1px); }
+    .fb-unlabeled { background: rgba(148,163,184,0.1); color: var(--muted); border: 1px solid rgba(148,163,184,0.25); flex: 100% !important; }
+    .fb-unlabeled:hover { background: rgba(148,163,184,0.2); transform: translateY(-1px); }
+    .feedback-done {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; color: var(--green2); font-weight: 600;
+    }
+    .feedback-done-icon { font-size: 20px; }
+
+    /* ===== ADMIN PANEL ===== */
+    .admin-toggle {
+      display: flex; align-items: center; gap: 10px;
+      cursor: pointer; padding: 12px 16px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); margin-bottom: 8px;
+      font-size: 13px; font-weight: 600; color: var(--muted);
+      transition: all 0.2s; user-select: none;
+    }
+    .admin-toggle:hover { color: var(--text); border-color: var(--border2); }
+    .admin-panel { animation: slideUp 0.3s ease; }
+    .admin-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;
+    }
+    .admin-stat-item {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px; text-align: center;
+    }
+    .admin-stat-val { font-size: 22px; font-weight: 800; color: var(--accent3); }
+    .admin-stat-label { font-size: 10px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+    .btn-retrain {
+      width: 100%; padding: 14px; border: none; border-radius: 10px;
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      color: white; font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: all 0.25s; box-shadow: 0 4px 16px rgba(99,102,241,0.3);
+    }
+    .btn-retrain:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(99,102,241,0.45); }
+    .btn-retrain:disabled { background: var(--surface2); color: var(--muted2); box-shadow: none; cursor: not-allowed; }
+
+    /* ===== KEYFRAMES ===== */
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 480px) {
+      .metric-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .metric-val  { font-size: 18px; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .banner-badge { display: none; }
+      .header h1 { font-size: 26px; }
+      .admin-stats { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
 <body>
+
+<!-- Animated background orbs -->
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
 <div class="container">
 
-  <!-- HEADER -->
+  <!-- ======= HEADER ======= -->
   <div class="header">
-    <h1>🔬 SPK Deteksi Awal Lesi Kulit</h1>
-    <p>Sistem Penunjang Keputusan berbasis CNN (MobileNetV2) + SVM</p>
-    <span class="badge">Dataset: ISIC | Akurasi: 87.73%</span>
+    <div class="logo-ring">🔬</div>
+    <h1>DermaScan AI</h1>
+    <p class="subtitle">
+      Sistem Penunjang Keputusan Deteksi Dini Lesi Kulit<br>
+      berbasis Kecerdasan Buatan
+    </p>
+    <div class="status-badge">
+      <div class="status-dot"></div>
+      Model Aktif · CNN MobileNetV2 + SVM
+    </div>
   </div>
 
-  <!-- UPLOAD CARD -->
+  <!-- ======= METRIC CARDS ======= -->
+  <div class="metric-grid">
+    <div class="metric-card">
+      <div class="metric-icon">🎯</div>
+      <div class="metric-val">87.73%</div>
+      <div class="metric-label">Akurasi Model</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon">🖼️</div>
+      <div class="metric-val">2K+</div>
+      <div class="metric-label">Data Latih</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-icon">🏷️</div>
+      <div class="metric-val">2 Kelas</div>
+      <div class="metric-label">Benign / Malignant</div>
+    </div>
+  </div>
+
+  <!-- ======= UPLOAD CARD ======= -->
   <div class="card">
-    <div class="card-title">Upload Citra Lesi Kulit</div>
+    <div class="card-header">
+      <div class="card-icon">📤</div>
+      <div class="card-title">Upload Citra Lesi Kulit</div>
+    </div>
 
+    <!-- Preview -->
     <div id="previewWrap">
-      <img id="previewImg" src="" alt="Preview">
-    </div>
-
-    <div class="upload-area" id="uploadArea">
-      <div class="upload-icon">📷</div>
-      <div class="upload-text">Klik atau drag & drop foto di sini</div>
-      <div class="upload-hint">Format: JPG, PNG, WEBP • Maksimal 16MB</div>
-      <input type="file" id="fileInput"
-             accept=".jpg,.jpeg,.png,.webp">
-    </div>
-
-    <button class="btn" id="predictBtn"
-            disabled onclick="predict()">
-      Analisis Gambar
-    </button>
-
-    <div class="loading" id="loading">
-      <span class="spinner"></span>
-      Menganalisis gambar...
-    </div>
-  </div>
-
-  <!-- RESULT CARD -->
-  <div class="card" id="resultCard">
-    <div class="card-title">Hasil Prediksi</div>
-
-    <!-- Kotak hasil utama -->
-    <div class="result-box" id="resultBox">
-      <div class="result-icon" id="resultIcon"></div>
-      <div>
-        <div class="result-label" id="resultLabel"></div>
-        <div class="result-sub"   id="resultSub"></div>
+      <div class="preview-box">
+        <img id="previewImg" src="" alt="Preview citra lesi kulit">
+        <div class="preview-overlay">
+          <span class="preview-file-icon">🖼️</span>
+          <div>
+            <div class="preview-filename" id="previewName">–</div>
+            <div class="preview-filesize" id="previewSize">–</div>
+          </div>
+          <div class="preview-change" onclick="changeImage()">Ganti</div>
+        </div>
       </div>
     </div>
 
-    <!-- Confidence bar -->
-    <div class="conf-row">
-      <span>Confidence</span>
-      <span id="confVal">-</span>
-    </div>
-    <div class="bar-wrap">
-      <div class="bar-fill" id="barFill" style="width:0%"></div>
-    </div>
-
-    <!-- Probabilitas -->
-    <div class="card-title">Probabilitas</div>
-    <div class="prob-row">
-      <span>Benign (Jinak)</span>
-      <span class="prob-val" id="probB">-</span>
-    </div>
-    <div class="prob-row">
-      <span>Malignant (Ganas)</span>
-      <span class="prob-val" id="probM">-</span>
+    <!-- Drop zone -->
+    <div class="upload-zone" id="uploadZone">
+      <span class="upload-icon-big">🩺</span>
+      <div class="upload-title">Klik atau Drag & Drop Foto</div>
+      <div class="upload-desc">Unggah citra dermoskopi atau foto lesi kulit</div>
+      <div class="upload-types">
+        <span>JPG</span><span>PNG</span><span>WEBP</span>
+      </div>
+      <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp">
     </div>
 
-    <p class="disclaimer">
-      ⚠️ Hasil ini hanya untuk keperluan akademik.<br>
-      Konsultasikan dengan dokter spesialis kulit.
-    </p>
+    <!-- Analyze button -->
+    <button class="btn-analyze" id="predictBtn" disabled onclick="runPredict()">
+      <span class="btn-icon">🔍</span>
+      Analisis Lesi Kulit
+    </button>
+
+    <!-- Loading -->
+    <div id="loading">
+      <div class="spinner-wrap">
+        <div class="ring-outer"></div>
+        <div class="ring-inner"></div>
+      </div>
+      <div class="loading-text">Mengekstraksi fitur & menganalisis...</div>
+      <div class="loading-sub">CNN MobileNetV2 → SVM Classifier</div>
+    </div>
   </div>
 
-</div>
+  <!-- ======= RESULT CARD ======= -->
+  <div class="card" id="resultCard">
+    <div class="card-header">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Hasil Analisis</div>
+    </div>
+
+    <!-- Result banner -->
+    <div class="result-banner" id="resultBanner">
+      <div class="banner-icon" id="bannerIcon"></div>
+      <div class="banner-body">
+        <div class="banner-tag" id="bannerTag"></div>
+        <div class="banner-label" id="bannerLabel"></div>
+        <div class="banner-desc" id="bannerDesc"></div>
+      </div>
+      <div class="banner-badge" id="bannerBadge">
+        <div class="confidence-ring" id="confRing"></div>
+        <small>confidence</small>
+      </div>
+    </div>
+
+    <!-- Probability bars -->
+    <div class="prob-section">
+      <div class="prob-row">
+        <div class="prob-row-header">
+          <div class="prob-label-wrap">
+            <div class="prob-dot dot-benign"></div>
+            <div>
+              <div class="prob-name">Benign (Jinak)</div>
+              <div class="prob-desc">Kemungkinan lesi bersifat jinak</div>
+            </div>
+          </div>
+          <div class="prob-pct pct-benign" id="probBenign">–</div>
+        </div>
+        <div class="bar-track"><div class="bar-fill fill-benign" id="barBenign"></div></div>
+      </div>
+
+      <div class="prob-row">
+        <div class="prob-row-header">
+          <div class="prob-label-wrap">
+            <div class="prob-dot dot-malignant"></div>
+            <div>
+              <div class="prob-name">Malignant (Ganas)</div>
+              <div class="prob-desc">Kemungkinan lesi bersifat ganas</div>
+            </div>
+          </div>
+          <div class="prob-pct pct-malignant" id="probMalignant">–</div>
+        </div>
+        <div class="bar-track"><div class="bar-fill fill-malignant" id="barMalignant"></div></div>
+      </div>
+    </div>
+
+    <!-- Kartu Khusus: Lesi Tidak Teridentifikasi (muncul jika confidence < 80%) -->
+    <div id="unknownInfoCard" style="display:none;">
+      <div class="unknown-card">
+        <div class="unknown-card-icon">🔬</div>
+        <div class="unknown-card-body">
+          <div class="unknown-card-title">Lesi Tidak Teridentifikasi</div>
+          <div class="unknown-card-msg">
+            Sistem tidak dapat mengklasifikasikan lesi pada foto yang diunggah
+            dikarenakan <strong>data latih model masih terbatas</strong>.
+            Karakteristik visual lesi tidak terwakili secara memadai dalam
+            distribusi data latih yang tersedia saat ini.
+          </div>
+          <div class="unknown-training-note">
+            <span class="unknown-note-icon">📚</span>
+            <span>
+              Foto yang Anda unggah akan kami jadikan
+              <strong>referensi data latih baru</strong> guna meningkatkan
+              kemampuan klasifikasi sistem di masa mendatang.
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail info grid -->
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="detail-item-label">🔺 Prediksi</div>
+        <div class="detail-item-val" id="detailPred">–</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">📈 Confidence Score</div>
+        <div class="detail-item-val" id="detailConf">–</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">⚖️ Tingkat Keyakinan</div>
+        <div class="detail-item-val" id="detailLevel">–</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-item-label">🤖 Model</div>
+        <div class="detail-item-val">CNN + SVM</div>
+      </div>
+    </div>
+
+    <!-- Recommendation -->
+    <div class="rec-box" id="recBox">
+      <div class="rec-title" id="recTitle"></div>
+      <ul class="rec-list" id="recList"></ul>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="disclaimer">
+      <span class="disclaimer-icon">⚠️</span>
+      <span>
+        <strong>Catatan Penting:</strong> Hasil analisis ini bersifat akademik dan merupakan
+        output dari model machine learning. Sistem ini <em>bukan</em> pengganti diagnosis
+        medis profesional. Selalu konsultasikan dengan dokter spesialis kulit (dermatologis)
+        untuk penanganan lebih lanjut.
+      </span>
+    </div>
+
+    <!-- ===== PANEL KONFIRMASI LABEL (Active Learning) ===== -->
+    <div class="feedback-panel" id="feedbackPanel">
+      <div class="feedback-header">
+        <span class="feedback-icon" id="feedbackIcon">🏷️</span>
+        <div>
+          <div class="feedback-title" id="feedbackTitle">Bantu Tingkatkan Model</div>
+          <div class="feedback-sub" id="feedbackSub">Apakah prediksi di atas sudah benar? Konfirmasi label agar foto ini bisa menjadi data training baru.</div>
+        </div>
+      </div>
+      <div class="feedback-buttons" id="feedbackButtons">
+        <button class="fb-btn fb-benign"     onclick="submitFeedback('benign')">✅ Benign (Jinak)</button>
+        <button class="fb-btn fb-malignant"  onclick="submitFeedback('malignant')">⚠️ Malignant (Ganas)</button>
+        <button class="fb-btn fb-unlabeled" id="btnUnlabeled" onclick="submitFeedback('unlabeled')" style="display:none;">❓ Saya Tidak Tahu — Simpan untuk Review</button>
+      </div>
+      <div class="feedback-done" id="feedbackDone" style="display:none;">
+        <span class="feedback-done-icon">✅</span>
+        <span id="feedbackDoneMsg">Terima kasih! Foto disimpan sebagai data training.</span>
+      </div>
+    </div>
+
+    <!-- Tech info -->
+    <div class="tech-section">
+      <div class="card-header" style="margin-top:20px; margin-bottom:8px;">
+        <div class="card-icon">⚙️</div>
+        <div class="card-title">Informasi Teknis</div>
+      </div>
+      <div class="tech-row">
+        <span class="tech-key">Arsitektur</span>
+        <span class="tech-val">CNN MobileNetV2 + SVM (RBF Kernel)</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-key">Dataset</span>
+        <span class="tech-val">ISIC Archive</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-key">Ukuran Input</span>
+        <span class="tech-val">224 × 224 px</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-key">Preprocessing</span>
+        <span class="tech-val">MobileNetV2 preprocess_input</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-key">Kelas Output</span>
+        <span class="tech-val">Benign &middot; Malignant</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-key">Threshold Keputusan</span>
+        <span class="tech-val" style="color:#34d399;">Confidence &ge; 80%</span>
+      </div>
+      <div class="tech-row">
+        <span class="tech-key">Di bawah threshold</span>
+        <span class="tech-val" style="color:#fbbf24;">Tidak Dapat Ditentukan</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= FOOTER ======= -->
+  <div class="footer">
+    DermaScan AI &nbsp;·&nbsp; Skripsi Sistem Penunjang Keputusan &nbsp;·&nbsp;
+    CNN (MobileNetV2) + SVM &nbsp;·&nbsp; ISIC Dataset<br>
+    <span style="color:var(--muted2)">Dibuat untuk keperluan akademik</span>
+  </div>
+
+  <!-- ======= PANEL ADMIN: RETRAINING (hanya localhost/admin) ======= -->
+  <div class="admin-toggle" id="adminToggleBtn" onclick="toggleAdmin()">
+    <span>⚙️</span> Panel Admin — Manajemen Model
+    <span id="adminArrow" style="margin-left:auto;">▼</span>
+  </div>
+  <div class="card admin-panel" id="adminPanel" style="display:none;">
+    <div class="card-header">
+      <div class="card-icon">🔄</div>
+      <div class="card-title">Retraining Model</div>
+    </div>
+
+    <!-- Stats grid -->
+    <div class="admin-stats" id="adminStats">
+      <div class="admin-stat-item">
+        <div class="admin-stat-val" id="statPendingB">–</div>
+        <div class="admin-stat-label">Data Pending<br>Benign</div>
+      </div>
+      <div class="admin-stat-item">
+        <div class="admin-stat-val" id="statPendingM">–</div>
+        <div class="admin-stat-label">Data Pending<br>Malignant</div>
+      </div>
+      <div class="admin-stat-item">
+        <div class="admin-stat-val" id="statTrainB">–</div>
+        <div class="admin-stat-label">Data Train<br>Benign</div>
+      </div>
+      <div class="admin-stat-item">
+        <div class="admin-stat-val" id="statTrainM">–</div>
+        <div class="admin-stat-label">Data Train<br>Malignant</div>
+      </div>
+      <div class="admin-stat-item">
+        <div class="admin-stat-val" id="statTotalFeedback">–</div>
+        <div class="admin-stat-label">Total<br>Feedback</div>
+      </div>
+      <div class="admin-stat-item">
+        <div class="admin-stat-val" id="statTotalRetrain">–</div>
+        <div class="admin-stat-label">Total<br>Retrain</div>
+      </div>
+    </div>
+
+    <div class="tech-row" style="margin-bottom:16px;">
+      <span class="tech-key">Retrain Terakhir</span>
+      <span class="tech-val" id="statLastRetrain">–</span>
+    </div>
+
+    <!-- Progress bar retraining -->
+    <div id="retrainProgressWrap" style="display:none; margin-bottom:16px;">
+      <div style="font-size:12px; color:var(--muted); margin-bottom:6px;" id="retrainProgressMsg">–</div>
+      <div class="bar-track" style="height:12px;">
+        <div class="bar-fill fill-benign" id="retrainProgressBar" style="width:0%; transition:width 0.5s ease;"></div>
+      </div>
+    </div>
+
+    <!-- Status badge -->
+    <div id="retrainStatusBadge" style="display:none; margin-bottom:16px; padding:10px 14px;
+         border-radius:10px; font-size:13px; font-weight:600;"></div>
+
+    <button class="btn-retrain" id="retrainBtn" onclick="triggerRetrain()">
+      🔄 Retrain Model Sekarang
+    </button>
+    <div style="font-size:11px; color:var(--muted); margin-top:10px; text-align:center;">
+      Server tetap melayani prediksi selama proses retraining berlangsung
+    </div>
+  </div>
+
+</div><!-- /container -->
+
 <script>
-const uploadArea  = document.getElementById('uploadArea');
+/* ================================================
+   STATE & DOM REFERENCES
+================================================ */
+const uploadZone  = document.getElementById('uploadZone');
 const fileInput   = document.getElementById('fileInput');
 const previewWrap = document.getElementById('previewWrap');
 const previewImg  = document.getElementById('previewImg');
+const previewName = document.getElementById('previewName');
+const previewSize = document.getElementById('previewSize');
 const predictBtn  = document.getElementById('predictBtn');
 const resultCard  = document.getElementById('resultCard');
 const loading     = document.getElementById('loading');
 
-uploadArea.onclick = () => fileInput.click();
+let selectedFile = null;
 
-uploadArea.addEventListener('dragover', e => {
-  e.preventDefault();
-  uploadArea.classList.add('dragover');
+/* ================================================
+   UPLOAD INTERACTIONS
+================================================ */
+uploadZone.onclick = () => fileInput.click();
+
+uploadZone.addEventListener('dragover', e => {
+  e.preventDefault(); uploadZone.classList.add('dragover');
 });
-uploadArea.addEventListener('dragleave', () =>
-  uploadArea.classList.remove('dragover'));
-uploadArea.addEventListener('drop', e => {
-  e.preventDefault();
-  uploadArea.classList.remove('dragover');
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('dragover');
   if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
-fileInput.onchange = () => {
-  if (fileInput.files[0]) handleFile(fileInput.files[0]);
-};
+fileInput.onchange = () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); };
+
+function changeImage() {
+  fileInput.click();
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(2) + ' MB';
+}
 
 function handleFile(file) {
+  selectedFile = file;
   const reader = new FileReader();
   reader.onload = e => {
-    previewImg.src            = e.target.result;
+    previewImg.src       = e.target.result;
+    previewName.textContent = file.name;
+    previewSize.textContent = formatBytes(file.size);
     previewWrap.style.display = 'block';
-    predictBtn.disabled       = false;
-    resultCard.style.display  = 'none';
+    uploadZone.style.display  = 'none';
+    predictBtn.disabled = false;
+    resultCard.style.display = 'none';
   };
   reader.readAsDataURL(file);
 }
 
-async function predict() {
-  const file = fileInput.files[0];
-  if (!file) return;
+/* ================================================
+   PREDICTION
+================================================ */
+async function runPredict() {
+  if (!selectedFile) return;
 
-  predictBtn.disabled      = true;
-  loading.style.display    = 'block';
+  predictBtn.disabled = true;
+  loading.style.display   = 'block';
   resultCard.style.display = 'none';
 
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', selectedFile);
 
   try {
-    const res  = await fetch('/predict', { method:'POST', body: formData });
+    const res  = await fetch('/predict', { method: 'POST', body: formData });
     const data = await res.json();
     loading.style.display = 'none';
     predictBtn.disabled   = false;
@@ -346,61 +867,318 @@ async function predict() {
   } catch (err) {
     loading.style.display = 'none';
     predictBtn.disabled   = false;
-    showError('Gagal terhubung ke server.');
+    showError('Gagal terhubung ke server. Pastikan server berjalan dan coba lagi.');
   }
 }
 
+/* ================================================
+   RENDER RESULT
+================================================ */
 function showResult(data) {
-  const isB = data.result === 'benign';
-  const isU = data.result === 'Tidak dapat ditentukan';
+  const isBenign    = data.result === 'benign';
+  const isUnknown   = data.result === 'Tidak dapat ditentukan';
+  const typeKey     = isUnknown ? 'unknown' : (isBenign ? 'benign' : 'malignant');
 
-  // Kotak hasil
-  const box = document.getElementById('resultBox');
-  box.className = 'result-box ' +
-    (isU ? 'box-unknown' : isB ? 'box-benign' : 'box-malignant');
+  const labels = {
+    benign:    { tag:'JINAK',                   label:'BENIGN',                    desc:'Lesi terklasifikasi sebagai jinak (non-kanker) \u00b7 Confidence \u2265 80%', icon:'\u2705' },
+    malignant: { tag:'GANAS',                   label:'MALIGNANT',                 desc:'Lesi terklasifikasi sebagai ganas (berpotensi kanker) \u00b7 Confidence \u2265 80%', icon:'\u26a0\ufe0f' },
+    unknown:   { tag:'TIDAK TERIDENTIFIKASI',   label:'Lesi Tidak Teridentifikasi', desc:'Karakteristik lesi tidak terwakili dalam data latih yang tersedia', icon:'\ud83d\udd2c' }
+  };
 
-  document.getElementById('resultIcon').textContent =
-    isU ? '❓' : isB ? '✅' : '⚠️';
+  const recs = {
+    benign: {
+      title: '\ud83d\udc9a Rekomendasi',
+      items: [
+        'Pantau lesi secara berkala \u2013 lakukan pemeriksaan mandiri setiap bulan.',
+        'Lakukan pemeriksaan rutin ke dokter kulit minimal 1x setahun.',
+        'Hindari paparan sinar UV berlebihan; gunakan tabir surya SPF 30+.',
+        'Segera konsultasi jika ada perubahan warna, ukuran, atau tekstur.'
+      ]
+    },
+    malignant: {
+      title: '\ud83d\udd34 Rekomendasi Segera',
+      items: [
+        'Segera konsultasikan dengan dokter spesialis kulit (dermatologis).',
+        'Hasil ini adalah output model ML \u2013 konfirmasi melalui biopsi kulit diperlukan.',
+        'Jangan menunda pemeriksaan medis profesional.',
+        'Dokumentasikan perkembangan lesi dengan foto berkala.'
+      ]
+    },
+    unknown: {
+      title: '\ud83e\ude7a Saran Medis',
+      items: [
+        'Lesi pada foto ini tidak dapat diidentifikasi oleh sistem dikarenakan keterbatasan data latih.',
+        'Untuk diagnosis yang akurat, segera konsultasikan dengan dokter spesialis kulit (dermatologis).',
+        'Jangan menunda pemeriksaan medis meskipun sistem tidak dapat memberikan keputusan.',
+        'Foto yang diunggah akan digunakan sebagai referensi data latih baru untuk peningkatan sistem.'
+      ]
+    }
+  };
 
-  const lbl = document.getElementById('resultLabel');
-  lbl.textContent = isU ? 'Tidak Dapat Ditentukan'
-                  : isB ? 'BENIGN (Jinak)'
-                  :       'MALIGNANT (Ganas)';
-  lbl.className = 'result-label ' +
-    (isU ? 'label-unknown' : isB ? 'label-benign' : 'label-malignant');
+  const info    = labels[typeKey];
+  const recInfo = recs[typeKey];
 
-  document.getElementById('resultSub').textContent =
-    `Tingkat Keyakinan: ${data.level}`;
+  // Banner
+  const banner = document.getElementById('resultBanner');
+  banner.className = `result-banner banner-${typeKey}`;
 
-  // Confidence bar
-  document.getElementById('confVal').textContent = `${data.confidence}%`;
-  const fill = document.getElementById('barFill');
-  fill.style.width = `${data.confidence}%`;
-  fill.className   = 'bar-fill ' +
-    (isU ? 'fill-unknown' : isB ? 'fill-benign' : 'fill-malignant');
+  const bannerIcon = document.getElementById('bannerIcon');
+  bannerIcon.className = `banner-icon icon-bg-${typeKey}`;
+  bannerIcon.textContent = info.icon;
 
-  // Probabilitas (hitung dari confidence)
-  const probB = isB ? data.confidence : (100 - data.confidence);
-  const probM = isB ? (100 - data.confidence) : data.confidence;
-  document.getElementById('probB').textContent = `${probB.toFixed(2)}%`;
-  document.getElementById('probM').textContent = `${probM.toFixed(2)}%`;
+  document.getElementById('bannerTag').className    = `banner-tag tag-${typeKey}`;
+  document.getElementById('bannerTag').textContent  = info.tag;
+  document.getElementById('bannerLabel').className  = `banner-label label-${typeKey}`;
+  document.getElementById('bannerLabel').textContent = info.label;
+  document.getElementById('bannerDesc').textContent  = info.desc;
+
+  const confRing = document.getElementById('confRing');
+  confRing.className   = `confidence-ring conf-${typeKey}`;
+  confRing.textContent = `${data.confidence}%`;
+
+  // ── Tampilan khusus berdasarkan hasil ──────────────────────────
+  const probSection    = document.querySelector('.prob-section');
+  const bannerBadge    = document.getElementById('bannerBadge');
+  const detailGrid     = document.querySelector('.detail-grid');
+  const unknownInfoCard = document.getElementById('unknownInfoCard');
+
+  if (isUnknown) {
+    // Sembunyikan elemen yang tidak relevan
+    probSection.style.display     = 'none';
+    bannerBadge.style.display     = 'none';
+    detailGrid.style.display      = 'none';
+    // Tampilkan kartu keterangan khusus
+    unknownInfoCard.style.display = 'block';
+    // Reset bar agar tidak ada animasi sisa
+    document.getElementById('barBenign').style.width    = '0%';
+    document.getElementById('barMalignant').style.width = '0%';
+  } else {
+    // Tampilkan semua elemen normal
+    probSection.style.display     = 'block';
+    bannerBadge.style.display     = '';
+    detailGrid.style.display      = 'grid';
+    unknownInfoCard.style.display = 'none';
+
+    // Probability bars
+    const pBenign    = data.prob_benign    ?? (isBenign ? data.confidence : 100 - data.confidence);
+    const pMalignant = data.prob_malignant ?? (isBenign ? 100 - data.confidence : data.confidence);
+
+    document.getElementById('probBenign').textContent    = `${pBenign.toFixed(2)}%`;
+    document.getElementById('probMalignant').textContent = `${pMalignant.toFixed(2)}%`;
+
+    setTimeout(() => {
+      document.getElementById('barBenign').style.width    = `${pBenign}%`;
+      document.getElementById('barMalignant').style.width = `${pMalignant}%`;
+    }, 80);
+
+    // Detail grid
+    document.getElementById('detailPred').textContent  = info.label;
+    document.getElementById('detailConf').textContent  = `${data.confidence}%`;
+    document.getElementById('detailLevel').textContent = data.level;
+  }
+
+
+  // Recommendation
+  const recBox   = document.getElementById('recBox');
+  const recTitle = document.getElementById('recTitle');
+  const recList  = document.getElementById('recList');
+  recBox.className   = `rec-box rec-${typeKey}`;
+  recTitle.className = `rec-title rec-title-${typeKey}`;
+  recTitle.textContent = recInfo.title;
+  recList.innerHTML = recInfo.items.map(item => `<li>${item}</li>`).join('');
+
+  // Set current filename untuk keperluan feedback
+  currentFilename = data.filename || null;
+
+  // ── Update panel feedback sesuai konteks hasil ─────────────────
+  const fbBtns      = document.getElementById('feedbackButtons');
+  const btnUnlabeled = document.getElementById('btnUnlabeled');
+  const fbTitle     = document.getElementById('feedbackTitle');
+  const fbSub       = document.getElementById('feedbackSub');
+  const fbIcon      = document.getElementById('feedbackIcon');
+
+  // Aktifkan & tampilkan tombol
+  fbBtns.style.display = 'flex';
+  fbBtns.querySelectorAll('button').forEach(b => b.disabled = false);
+  document.getElementById('feedbackDone').style.display = 'none';
+
+  if (isUnknown) {
+    // Konteks: sistem tidak tahu → tanya apakah USER tahu labelnya
+    fbIcon.textContent  = '\ud83d\udcda';
+    fbTitle.textContent = 'Bantu Lengkapi Data Latih';
+    fbSub.textContent   = 'Apakah Anda mengetahui label yang sebenarnya untuk foto ini? Jawaban Anda akan membantu meningkatkan kemampuan sistem.';
+    btnUnlabeled.style.display = 'block';   // tampilkan tombol "Tidak Tahu"
+  } else {
+    // Konteks: sistem sudah prediksi → tanya apakah prediksi sudah benar
+    fbIcon.textContent  = '\ud83c\udff7\ufe0f';
+    fbTitle.textContent = 'Bantu Tingkatkan Model';
+    fbSub.textContent   = 'Apakah prediksi di atas sudah benar? Konfirmasi label agar foto ini bisa menjadi data training baru.';
+    btnUnlabeled.style.display = 'none';    // sembunyikan tombol "Tidak Tahu"
+  }
+
+  resultCard.style.display = 'block';
+  setTimeout(() => resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+function showError(msg) {
+  const banner = document.getElementById('resultBanner');
+  banner.className = 'result-banner banner-unknown';
+  document.getElementById('bannerIcon').className  = 'banner-icon icon-bg-unknown';
+  document.getElementById('bannerIcon').textContent = '\u274c';
+  document.getElementById('bannerTag').className   = 'banner-tag tag-unknown';
+  document.getElementById('bannerTag').textContent = 'ERROR';
+  document.getElementById('bannerLabel').className = 'banner-label label-unknown';
+  document.getElementById('bannerLabel').textContent = 'Analisis Gagal';
+  document.getElementById('bannerDesc').textContent  = msg;
+  document.getElementById('confRing').textContent   = '\u2013';
+  document.getElementById('probBenign').textContent    = '\u2013';
+  document.getElementById('probMalignant').textContent = '\u2013';
+  document.getElementById('barBenign').style.width    = '0%';
+  document.getElementById('barMalignant').style.width = '0%';
+  document.getElementById('detailPred').textContent  = '\u2013';
+  document.getElementById('detailConf').textContent  = '\u2013';
+  document.getElementById('detailLevel').textContent = '\u2013';
+  document.getElementById('thresholdNotice').style.display = 'none';
+  document.getElementById('feedbackButtons').style.display = 'flex';
+  document.getElementById('feedbackDone').style.display    = 'none';
+
+  const recBox = document.getElementById('recBox');
+  recBox.className = 'rec-box rec-unknown';
+  document.getElementById('recTitle').textContent = '\ud83d\udfe1 Saran';
+  document.getElementById('recList').innerHTML = `<li>Pastikan file yang diupload adalah gambar valid (JPG/PNG/WEBP).</li><li>Pastikan ukuran gambar tidak terlalu kecil (minimal 30×30 piksel).</li><li>Hubungi administrator jika masalah berlanjut.</li>`;
 
   resultCard.style.display = 'block';
   resultCard.scrollIntoView({ behavior: 'smooth' });
 }
 
-function showError(msg) {
-  const box = document.getElementById('resultBox');
-  box.className = 'result-box box-unknown';
-  document.getElementById('resultIcon').textContent  = '❌';
-  document.getElementById('resultLabel').textContent = 'Error';
-  document.getElementById('resultLabel').className   = 'result-label label-unknown';
-  document.getElementById('resultSub').textContent   = msg;
-  document.getElementById('confVal').textContent     = '-';
-  document.getElementById('barFill').style.width     = '0%';
-  document.getElementById('probB').textContent       = '-';
-  document.getElementById('probM').textContent       = '-';
-  resultCard.style.display = 'block';
+/* ================================================
+   ACTIVE LEARNING: FEEDBACK
+================================================ */
+let currentFilename = null;
+
+async function submitFeedback(label) {
+  if (!currentFilename) return;
+
+  const btns = document.getElementById('feedbackButtons');
+  btns.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  try {
+    const res  = await fetch('/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: currentFilename, label })
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert('Gagal menyimpan feedback: ' + data.error);
+      btns.querySelectorAll('button').forEach(b => b.disabled = false);
+      return;
+    }
+    btns.style.display = 'none';
+    document.getElementById('feedbackDoneMsg').textContent =
+      `Terima kasih! Foto disimpan sebagai data ${label}. Total pending: ${data.pending_total} foto.`;
+    document.getElementById('feedbackDone').style.display = 'flex';
+  } catch(e) {
+    alert('Error saat mengirim feedback.');
+    btns.querySelectorAll('button').forEach(b => b.disabled = false);
+  }
+}
+
+/* ================================================
+   ADMIN PANEL — hanya tampil di localhost
+================================================ */
+let adminOpen = false;
+let retrainPolling = null;
+
+// Deteksi localhost: sembunyikan panel admin jika bukan localhost
+(function() {
+  const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+  if (!isLocalhost) {
+    const btn = document.getElementById('adminToggleBtn');
+    if (btn) btn.style.display = 'none';
+  }
+})();
+
+function toggleAdmin() {
+  adminOpen = !adminOpen;
+  document.getElementById('adminPanel').style.display = adminOpen ? 'block' : 'none';
+  document.getElementById('adminArrow').textContent = adminOpen ? '\u25b2' : '\u25bc';
+  if (adminOpen) loadAdminStats();
+}
+
+async function loadAdminStats() {
+  try {
+    const res  = await fetch('/retrain-status');
+    const data = await res.json();
+    document.getElementById('statPendingB').textContent      = data.pending_benign;
+    document.getElementById('statPendingM').textContent      = data.pending_malignant;
+    document.getElementById('statTrainB').textContent        = data.train_benign;
+    document.getElementById('statTrainM').textContent        = data.train_malignant;
+    document.getElementById('statTotalFeedback').textContent = data.total_feedback;
+    document.getElementById('statTotalRetrain').textContent  = data.total_retrain;
+    document.getElementById('statLastRetrain').textContent   = data.last_retrain;
+
+    updateRetrainUI(data);
+  } catch(e) { console.warn('Gagal load admin stats:', e); }
+}
+
+function updateRetrainUI(data) {
+  const btn      = document.getElementById('retrainBtn');
+  const progWrap = document.getElementById('retrainProgressWrap');
+  const progBar  = document.getElementById('retrainProgressBar');
+  const progMsg  = document.getElementById('retrainProgressMsg');
+  const badge    = document.getElementById('retrainStatusBadge');
+
+  if (data.state === 'running') {
+    btn.disabled = true;
+    btn.textContent = '\u23f3 Sedang Retraining...';
+    progWrap.style.display = 'block';
+    progBar.style.width    = data.progress + '%';
+    progMsg.textContent    = data.message;
+    badge.style.display    = 'none';
+    // Lanjutkan polling
+    if (!retrainPolling) {
+      retrainPolling = setInterval(loadAdminStats, 2000);
+    }
+  } else {
+    btn.disabled = false;
+    btn.textContent = '\ud83d\udd04 Retrain Model Sekarang';
+    if (retrainPolling) { clearInterval(retrainPolling); retrainPolling = null; }
+
+    if (data.state === 'done') {
+      progWrap.style.display = 'none';
+      badge.style.display    = 'block';
+      badge.style.background = 'rgba(16,185,129,0.1)';
+      badge.style.color      = '#34d399';
+      badge.style.border     = '1px solid rgba(16,185,129,0.25)';
+      badge.textContent      = '\u2705 ' + data.message;
+    } else if (data.state === 'error') {
+      progWrap.style.display = 'none';
+      badge.style.display    = 'block';
+      badge.style.background = 'rgba(239,68,68,0.1)';
+      badge.style.color      = '#f87171';
+      badge.style.border     = '1px solid rgba(239,68,68,0.25)';
+      badge.textContent      = '\u274c ' + data.message;
+    } else {
+      progWrap.style.display = 'none';
+      badge.style.display    = 'none';
+    }
+  }
+}
+
+async function triggerRetrain() {
+  if (!confirm('Mulai retraining model? Server tetap melayani prediksi selama proses berlangsung.')) return;
+  try {
+    const res  = await fetch('/retrain', { method: 'POST' });
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+    loadAdminStats();
+  } catch(e) {
+    alert('Gagal memulai retraining.');
+  }
 }
 </script>
 </body>
