@@ -16,8 +16,14 @@ import datetime
 
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras.models import load_model
-
 from werkzeug.utils import secure_filename
+
+# HuggingFace Hub untuk sinkronisasi data feedback ke HF Dataset
+try:
+    from huggingface_hub import HfApi
+    HF_HUB_AVAILABLE = True
+except ImportError:
+    HF_HUB_AVAILABLE = False
 
 # ============================================================
 # KONFIGURASI
@@ -36,9 +42,14 @@ DATA_TRAIN_DIR   = 'data/train'          # data training asli (base)
 DATA_PENDING_DIR = 'data/pending'        # foto baru dari user (belum ditraining)
 DATA_TRAINED_DIR = 'data/trained'        # foto dari pending yg sudah dipakai retrain
 
-MODEL_SVM_PATH   = 'svm_mobilenet_model.pkl'
+MODEL_SVM_PATH    = 'svm_mobilenet_model.pkl'
 MODEL_BACKUP_PATH = 'svm_mobilenet_model_backup.pkl'
-STATS_PATH       = 'data/stats.json'
+STATS_PATH        = 'data/stats.json'
+
+# HuggingFace Dataset untuk sinkronisasi feedback
+# Token dibaca dari environment variable (aman, tidak hardcode)
+HF_TOKEN      = os.environ.get('HF_TOKEN', '')
+HF_DATASET_ID = os.environ.get('HF_DATASET_ID', 'fhalmz/dermascan-feedback')
 
 # Pastikan semua folder ada
 for _dir in [
@@ -95,6 +106,33 @@ def _save_stats(stats):
     os.makedirs(os.path.dirname(STATS_PATH), exist_ok=True)
     with open(STATS_PATH, 'w') as f:
         json.dump(stats, f, indent=2)
+
+
+def _upload_to_hf_dataset(local_path, label, filename):
+    """
+    Upload foto feedback ke HuggingFace Dataset secara background.
+    Folder di dataset: images/<label>/
+    Gagal secara diam-diam jika token tidak ada — tidak mengganggu fungsi utama.
+    """
+    if not HF_HUB_AVAILABLE or not HF_TOKEN:
+        return  # Tidak ada token → skip upload (mode lokal)
+
+    def _do_upload():
+        try:
+            api = HfApi(token=HF_TOKEN)
+            path_in_repo = f'images/{label}/{filename}'
+            api.upload_file(
+                path_or_fileobj=local_path,
+                path_in_repo=path_in_repo,
+                repo_id=HF_DATASET_ID,
+                repo_type='dataset',
+                commit_message=f'feedback: add {label} image {filename}',
+            )
+            print(f'[HF Dataset] Upload OK: {path_in_repo}')
+        except Exception as e:
+            print(f'[HF Dataset] Upload gagal (non-fatal): {e}')
+
+    threading.Thread(target=_do_upload, daemon=True).start()
 
 
 def _count_pending():
@@ -387,6 +425,9 @@ def feedback():
         dst_path = os.path.join(dst_dir, f'{base}_{ts}{ext}')
 
     shutil.copy2(src, dst_path)
+
+    # Upload ke HF Dataset secara background (untuk sinkronisasi ke admin)
+    _upload_to_hf_dataset(dst_path, label, os.path.basename(dst_path))
 
     # Pesan balasan sesuai label
     if label == 'unlabeled':
